@@ -1,0 +1,19 @@
+{
+  "name": "Coffee BI",
+  "dataColors": ["#8C5A3C", "#3F8F7B", "#C9A27A", "#C0504D", "#5B7DB1", "#E0A84A", "#7A6A5A", "#9BB7A8"],
+  "background": "#FFFFFF",
+  "foreground": "#503524",
+  "tableAccent": "#8C5A3C",
+  "good": "#3F8F7B",
+  "neutral": "#E0A84A",
+  "bad": "#C0504D",
+  "maximum": "#8C5A3C",
+  "center": "#E4D6C6",
+  "minimum": "#FFFFFF",
+  "textClasses": {
+    "label": { "fontFace": "Segoe UI", "fontSize": 10, "color": "#503524" },
+    "callout": { "fontFace": "Segoe UI Semibold", "fontSize": 24, "color": "#503524" },
+    "title": { "fontFace": "Segoe UI Semibold", "fontSize": 12, "color": "#503524" },
+    "header": { "fontFace": "Segoe UI Semibold", "fontSize": 11, "color": "#503524" }
+  }
+}

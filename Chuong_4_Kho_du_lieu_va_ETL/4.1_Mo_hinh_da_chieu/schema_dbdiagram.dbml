@@ -1,0 +1,184 @@
+// =====================================================================
+// DỰ ÁN COFFEE BI - STAR SCHEMA / ERD (MỤC 4.1)
+// Copy toàn bộ nội dung này dán vào https://dbdiagram.io
+// =====================================================================
+
+// --------------------------------------------------
+// 1. CÁC CHIỀU DỮ LIỆU (DIMENSIONS)
+// --------------------------------------------------
+
+Table Dim_Date {
+  date_key int [pk, note: 'Khóa ngày YYYYMMDD (Dải ngày từ 2022-12-26 đến 2023-06-30)']
+  full_date date [not null, note: 'Ngày đầy đủ YYYY-MM-DD']
+  day_of_week tinyint [not null, note: 'Chuẩn ISO: 1 = Thứ Hai, 2 = Thứ Ba, ..., 7 = Chủ Nhật']
+  day_name varchar(15) [not null, note: 'Tên thứ: Monday, Tuesday,...']
+  day_of_month tinyint [not null, note: 'Ngày trong tháng (1-31)']
+  day_of_year smallint [not null, note: 'Ngày trong năm (1-366)']
+  week_no tinyint [not null, note: 'Số thứ tự tuần kiểm kê (1-27)']
+  week_start_date date [not null, note: 'Ngày bắt đầu của tuần (Thứ Hai, tuần 1 bắt đầu 2022-12-26)']
+  week_end_date date [not null, note: 'Ngày kết thúc của tuần (Chủ Nhật)']
+  month_no tinyint [not null, note: 'Tháng trong năm (1-12)']
+  month_name varchar(15) [not null, note: 'Tên tháng: January,...']
+  quarter_no tinyint [not null, note: 'Quý trong năm (1-4)']
+  year_no smallint [not null, note: 'Năm (2022, 2023)']
+  is_weekend boolean [not null, default: false, note: 'Đánh dấu cuối tuần (TRUE nếu Thứ Bảy hoặc Chủ Nhật)']
+
+  indexes {
+    full_date [unique, name: 'uk_full_date']
+  }
+}
+
+Table Dim_Store {
+  store_id int [pk, note: 'Mã định danh cửa hàng POS (3, 5, 8)']
+  store_location varchar(100) [not null, note: 'Tên chi nhánh: Astoria, Lower Manhattan, Hell\'s Kitchen']
+  neighborhood varchar(100) [note: 'Khu vực / Quận']
+  city varchar(50) [not null, default: 'New York', note: 'Thành phố']
+  state varchar(10) [not null, default: 'NY', note: 'Bang']
+  status varchar(20) [not null, default: 'Active', note: 'Trạng thái hoạt động']
+}
+
+Table Dim_Shift {
+  shift_id int [pk, note: 'Khóa ca làm việc: 1, 2, 3']
+  shift_name varchar(20) [not null, note: 'Tên ca: Sáng, Chiều, Tối']
+  start_hour tinyint [not null, note: 'Giờ bắt đầu (6, 11, 16)']
+  end_hour tinyint [not null, note: 'Giờ kết thúc (10, 15, 20)']
+  time_range_desc varchar(50) [not null, note: 'Mô tả khung giờ: 06:00 - 10:59, 11:00 - 15:59, 16:00 - 20:59']
+}
+
+Table Dim_Menu_Item {
+  product_id int [pk, note: 'Mã món POS gốc trong khoảng 1-87; không yêu cầu liên tục']
+  product_name varchar(150) [not null, note: 'Tên món POS đầy đủ (product_detail)']
+  base_item varchar(100) [not null, note: 'Tên món gốc sau khi tách size (VD: Brewed Chai tea)']
+  size varchar(10) [note: 'Kích cỡ ly: Sm, Rg, Lg, Shot, NA']
+  product_category varchar(50) [not null, note: 'Nhóm sản phẩm: Coffee, Tea, Drinking Chocolate, Bakery,...']
+  product_type varchar(50) [not null, note: 'Phân loại chi tiết món: Gourmet brewed coffee, Barista Espresso,...']
+  is_drink boolean [not null, default: false, note: 'Cờ nhận diện đồ uống pha chế (TRUE: 41 đồ uống, FALSE: 39 hàng khác)']
+  unit_of_measure varchar(20) [not null, default: 'Ly/Cốc', note: 'Đơn vị tính bán lẻ']
+  is_active boolean [not null, default: true, note: 'Trạng thái kinh doanh']
+}
+
+Table Dim_Ingredient {
+  ingredient_id varchar(20) [pk, note: 'Mã nguyên vật liệu (I001 - I025)']
+  ingredient_name varchar(150) [not null, note: 'Tên nguyên vật liệu (VD: Espresso Coffee, Fresh Milk)']
+  ingredient_group varchar(50) [not null, note: 'Nhóm NVL: Cà phê, Sữa, Trà, Chocolate, Bao bì, Phụ liệu']
+  unit varchar(20) [not null, note: 'Đơn vị lưu kho/mua vào AP (g, ml, cái)']
+  unit_cost_usd decimal(10,4) [not null, note: 'Đơn giá mua chuẩn AP (USD)']
+  yield_pct decimal(5,2) [not null, default: 100.00, note: 'Tỷ lệ thu hồi tiêu chuẩn Yield %']
+  shelf_life_days int [note: 'Hạn sử dụng tiêu chuẩn (ngày)']
+  is_stocked boolean [not null, default: true, note: 'TRUE: thuộc phạm vi kiểm kê. FALSE: ngoài phạm vi, ví dụ I020']
+}
+
+// --------------------------------------------------
+// 2. BẢNG CẦU (BRIDGE TABLE)
+// --------------------------------------------------
+
+Table Bridge_BOM {
+  bom_id int [pk, increment, note: 'Khóa đại diện định mức BOM']
+  product_id int [not null, note: 'FK -> Dim_Menu_Item (41 món đồ uống)']
+  ingredient_id varchar(20) [not null, note: 'FK -> Dim_Ingredient (23 NVL trong công thức)']
+  bom_version varchar(20) [not null, default: 'v1.0', note: 'Phiên bản định mức công thức']
+  quantity_ep decimal(10,4) [not null, note: 'Định lượng thành phẩm thực tế tiêu hao (Edible Portion)']
+  quantity_basis varchar(10) [not null, default: 'EP', note: 'Cơ sở định lượng (EP)']
+  quantity_ap decimal(10,4) [not null, note: 'Định lượng quy đổi mua vào AP = EP / (Yield / 100)']
+  effective_start_date date [not null, default: '2023-01-01', note: 'Ngày áp dụng phiên bản định mức']
+  effective_end_date date [not null, default: '9999-12-31', note: 'Ngày hết hiệu lực phiên bản định mức']
+  source_note text [note: 'Ghi chú nguồn định mức và giả định nghiệp vụ']
+
+  indexes {
+    (product_id, ingredient_id, bom_version) [unique, name: 'uk_prod_ing_ver']
+  }
+}
+
+// --------------------------------------------------
+// 3. CÁC BẢNG SỰ KIỆN (FACT TABLES)
+// --------------------------------------------------
+
+Table Fact_Sales {
+  sales_fact_id bigint [pk, increment, note: 'Khóa đại diện dòng Fact Sales']
+  transaction_id bigint [not null, note: 'Mã dòng POS gốc; kiểm tra duy nhất trước khi nạp']
+  date_key int [not null, note: 'FK -> Dim_Date (YYYYMMDD)']
+  store_id int [not null, note: 'FK -> Dim_Store']
+  product_id int [not null, note: 'FK -> Dim_Menu_Item']
+  shift_id int [not null, note: 'FK -> Dim_Shift']
+  transaction_time time [not null, note: 'Giờ phát sinh giao dịch (HH:MM:SS)']
+  transaction_datetime datetime [not null, note: 'Thời điểm giao dịch chuẩn']
+  transaction_qty int [not null, note: 'Số lượng món bán ra']
+  unit_price decimal(10,2) [not null, note: 'Đơn giá ghi nhận trên dòng POS']
+  revenue decimal(12,2) [not null, note: 'Doanh thu dòng = transaction_qty * unit_price']
+  std_cost_unit_usd decimal(10,4) [note: 'Giá vốn định mức đơn vị = tổng (quantity_ap * unit_cost_usd)']
+  total_std_cogs_usd decimal(12,4) [note: 'Tổng giá vốn định mức = transaction_qty * std_cost_unit_usd']
+  contribution_margin_usd decimal(12,4) [note: 'Lợi nhuận đóng góp dòng = revenue - total_std_cogs_usd']
+  outlier_flag boolean [not null, default: false, note: 'Cờ phát hiện ngoại lai (1 nếu dòng nằm ngoài ngưỡng IQR)']
+
+  indexes {
+    transaction_id [unique, name: 'uk_sales_transaction_id']
+  }
+}
+
+Table Fact_Inventory_Audit {
+  audit_fact_id bigint [pk, increment, note: 'Khóa đại diện dòng kiểm kê tồn kho']
+  store_id int [not null, note: 'FK -> Dim_Store']
+  ingredient_id varchar(20) [not null, note: 'FK -> Dim_Ingredient (22 NVL kiểm kê)']
+  week_start_date_key int [not null, note: 'FK -> Dim_Date (Ngày Thứ Hai đầu tuần kiểm kê YYYYMMDD)']
+  week_no tinyint [not null, note: 'Số thứ tự tuần kiểm kê (1 - 27)']
+  days_observed tinyint [not null, default: 7, note: 'Số ngày mở cửa thực tế ghi nhận trong tuần']
+  opening_qty decimal(12,3) [not null, default: 0.000, note: 'Số lượng tồn đầu tuần']
+  receipt_qty decimal(12,3) [not null, default: 0.000, note: 'Số lượng nhập kho trong tuần']
+  actual_usage decimal(12,3) [not null, default: 0.000, note: 'Lượng tiêu hao thực tế AU = Tồn đầu + Nhập - Tồn cuối']
+  closing_qty decimal(12,3) [not null, default: 0.000, note: 'Số lượng kiểm kê tồn cuối tuần chốt sổ']
+  theoretical_usage decimal(12,3) [not null, default: 0.000, note: 'Lượng tiêu hao lý thuyết TU = Tổng (Sales_Qty * BOM_AP)']
+  variance_qty decimal(12,3) [not null, default: 0.000, note: 'Chênh lệch tiêu hao Variance = AU - TU']
+  recorded_waste_qty decimal(12,3) [not null, default: 0.000, note: 'Lượng hủy ghi nhận có phiếu W (tổng hợp từ Fact_Waste_Log)']
+  unexplained_shrinkage_qty decimal(12,3) [not null, default: 0.000, note: 'Hao hụt chưa giải thích U = Variance - Recorded Waste']
+  unit_cost_usd decimal(10,4) [not null, note: 'Đơn giá mua NVL AP tại thời điểm chốt sổ']
+  actual_cogs_usd decimal(12,4) [not null, note: 'Giá trị tiêu hao thực tế theo đơn giá chuẩn = AU * unit_cost_usd']
+  opening_value_usd decimal(12,4) [not null, note: 'Giá trị tồn đầu kỳ (USD)']
+  closing_value_usd decimal(12,4) [not null, note: 'Giá trị tồn cuối kỳ (USD)']
+  variance_value_usd decimal(12,4) [not null, note: 'Giá trị chênh lệch = Variance * unit_cost_usd']
+  unexplained_value_usd decimal(12,4) [not null, note: 'Giá trị hao hụt chưa giải thích = U * unit_cost_usd']
+  variance_rate_pct decimal(8,4) [note: '100 * (AU - TU) / TU. NULL nếu TU = 0']
+  waste_rate_pct decimal(8,4) [note: '100 * Recorded Waste / AU. NULL nếu AU = 0']
+
+  indexes {
+    (store_id, ingredient_id, week_start_date_key) [unique, name: 'uk_store_ing_week_key']
+  }
+}
+
+Table Fact_Waste_Log {
+  waste_fact_id bigint [pk, increment, note: 'Khóa đại diện sự kiện hủy']
+  date_key int [not null, note: 'FK -> Dim_Date (YYYYMMDD)']
+  store_id int [not null, note: 'FK -> Dim_Store']
+  ingredient_id varchar(20) [not null, note: 'FK -> Dim_Ingredient']
+  shift_id int [not null, note: 'FK -> Dim_Shift']
+  waste_datetime datetime [not null, note: 'Thời điểm lập phiếu hủy chính xác']
+  week_no tinyint [not null, note: 'Tuần tương ứng']
+  reason varchar(100) [not null, note: 'Lý do hủy: Pha lỗi, Rơi vãi, Hết hạn, Hỏng/rách, Hư hỏng do ẩm,...']
+  waste_qty decimal(10,3) [not null, note: 'Số lượng hủy thực tế theo đơn vị kho']
+  unit_cost_usd decimal(10,4) [not null, note: 'Đơn giá NVL tại thời điểm hủy']
+  waste_value_usd decimal(12,4) [not null, note: 'Giá trị thiệt hại do hủy hàng = waste_qty * unit_cost_usd']
+}
+
+// --------------------------------------------------
+// 4. KHAI BÁO CÁC MỐI QUAN HỆ (RELATIONSHIPS)
+// --------------------------------------------------
+
+// Quan hệ cho Fact_Sales
+Ref: Fact_Sales.date_key > Dim_Date.date_key
+Ref: Fact_Sales.store_id > Dim_Store.store_id
+Ref: Fact_Sales.product_id > Dim_Menu_Item.product_id
+Ref: Fact_Sales.shift_id > Dim_Shift.shift_id
+
+// Quan hệ cho Fact_Inventory_Audit
+Ref: Fact_Inventory_Audit.store_id > Dim_Store.store_id
+Ref: Fact_Inventory_Audit.ingredient_id > Dim_Ingredient.ingredient_id
+Ref: Fact_Inventory_Audit.week_start_date_key > Dim_Date.date_key
+
+// Quan hệ cho Fact_Waste_Log
+Ref: Fact_Waste_Log.date_key > Dim_Date.date_key
+Ref: Fact_Waste_Log.store_id > Dim_Store.store_id
+Ref: Fact_Waste_Log.ingredient_id > Dim_Ingredient.ingredient_id
+Ref: Fact_Waste_Log.shift_id > Dim_Shift.shift_id
+
+// Quan hệ bảng cầu Bridge_BOM (n-n giữa Món và NVL)
+Ref: Bridge_BOM.product_id > Dim_Menu_Item.product_id
+Ref: Bridge_BOM.ingredient_id > Dim_Ingredient.ingredient_id
